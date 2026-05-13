@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ballistik Rechner</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <style>
+        /* ── Tokens ─────────────────────────────────────────────── */
+        :root {
+            --bg:          #f9fafb;
+            --surface:     #ffffff;
+            --surface2:    #f3f4f6;
+            --border:      #e5e7eb;
+            --border2:     #d1d5db;
+            --text:        #111827;
+            --text2:       #4b5563;
+            --text3:       #9ca3af;
+            --input-bg:    #f9fafb;
+            --blue:        #2563eb;
+            --blue-hover:  #1d4ed8;
+            --green:       #16a34a;
+            --red:         #dc2626;
+            --btn-gray:    #374151;
+            --btn-gray-hv: #1f2937;
+            --chart-grid:  #d1d5db;
+            --chart-zero:  #ef4444;
+            --chart-fill:  rgba(37,99,235,0.15);
+            --shadow:      0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.06);
+        }
+        [data-theme="dark"] {
+            --bg:          #0f1117;
+            --surface:     #1a1d27;
+            --surface2:    #252836;
+            --border:      #2e3244;
+            --border2:     #3a3f55;
+            --text:        #e8eaf0;
+            --text2:       #9ba3b8;
+            --text3:       #5c6480;
+            --input-bg:    #252836;
+            --blue:        #3b82f6;
+            --blue-hover:  #60a5fa;
+            --green:       #4ade80;
+            --red:         #f87171;
+            --btn-gray:    #374151;
+            --btn-gray-hv: #4b5563;
+            --chart-grid:  #2e3244;
+            --chart-zero:  #f87171;
+            --chart-fill:  rgba(59,130,246,0.12);
+            --shadow:      0 1px 3px rgba(0,0,0,.4);
+        }
+
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            transition: background .2s, color .2s;
+        }
+        canvas { max-height: 380px; }
+        @media print { .no-print { display: none !important; } }
+
+        .wrap   { max-width: 1152px; margin: 0 auto; padding: 24px; }
+        .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px; }
+        h1      { font-size: 2rem; font-weight: 700; }
+        .grid   { display: grid; grid-template-columns: 1fr; gap: 32px; }
+        @media (min-width: 1024px) { .grid { grid-template-columns: 1fr 2fr; } }
+        .col2   { display: flex; flex-direction: column; gap: 32px; }
+
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 28px;
+            box-shadow: var(--shadow);
+        }
+        .card h2 { font-size: 1.1rem; font-weight: 600; margin-bottom: 20px; }
+
+        .fields { display: flex; flex-direction: column; gap: 16px; }
+        .field-label {
+            display: block;
+            font-size: .8rem;
+            color: var(--text2);
+            margin-bottom: 4px;
+        }
+        input[type=number], select {
+            width: 100%;
+            background: var(--input-bg);
+            border: 1px solid var(--border2);
+            border-radius: 16px;
+            padding: 10px 16px;
+            font-size: .95rem;
+            color: var(--text);
+            outline: none;
+            transition: border-color .15s;
+        }
+        input[type=number]:focus, select:focus { border-color: var(--blue); }
+        select option { background: var(--surface); color: var(--text); }
+
+        .btn-actions { margin-top: 28px; display: flex; flex-direction: column; gap: 10px; }
+        .btn {
+            border: none; cursor: pointer; border-radius: 16px;
+            font-size: .95rem; font-weight: 600;
+            transition: background .15s, opacity .15s;
+        }
+        .btn:active { opacity: .85; }
+        .btn-primary { background: var(--blue); color: #fff; padding: 14px; font-size: 1rem; width: 100%; }
+        .btn-primary:hover { background: var(--blue-hover); }
+        .btn-row  { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .btn-green { background: #16a34a; color: #fff; padding: 12px; }
+        .btn-green:hover { background: #15803d; }
+        .btn-gray  { background: var(--btn-gray); color: #fff; padding: 12px; }
+        .btn-gray:hover  { background: var(--btn-gray-hv); }
+
+        .theme-btn {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 50%;
+            width: 40px; height: 40px;
+            cursor: pointer; font-size: 1.1rem;
+            display: flex; align-items: center; justify-content: center;
+            transition: background .2s; flex-shrink: 0;
+        }
+        .theme-btn:hover { background: var(--border2); }
+
+        .summary {
+            display: grid; grid-template-columns: repeat(3,1fr);
+            gap: 16px; margin-bottom: 20px;
+            background: var(--surface2);
+            border-radius: 16px; padding: 16px;
+            font-size: .85rem;
+        }
+        .s-label { color: var(--text2); margin-bottom: 2px; }
+        .s-val   { font-size: 1.15rem; font-weight: 600; }
+
+        .tbl-wrap { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+        thead th {
+            padding: 12px 8px; text-align: right;
+            font-weight: 600; color: var(--text2);
+            border-bottom: 1px solid var(--border2);
+            background: var(--surface);
+            position: sticky; top: 0;
+        }
+        thead th:first-child { text-align: left; }
+        tbody tr { border-bottom: 1px solid var(--border); }
+        tbody tr:hover { background: var(--surface2); }
+        tbody td { padding: 12px 8px; text-align: right; color: var(--text); }
+        tbody td:first-child { text-align: left; font-weight: 500; }
+
+        .cal-badge {
+            display: inline-block; margin-left: 6px;
+            font-size: .7rem; font-weight: 700;
+            background: color-mix(in srgb, var(--blue) 15%, transparent);
+            color: var(--blue);
+            padding: 1px 8px; border-radius: 999px;
+        }
+        .cal-badge.muted { background: var(--surface2); color: var(--text3); }
+    </style>
+</head>
+<body>
+<div class="wrap">
+    <div class="topbar">
+        <h1>Ballistik Rechner</h1>
+        <button class="theme-btn no-print" id="themeBtn" onclick="toggleTheme()" title="Dark/Light Mode">🌙</button>
+    </div>
+
+    <div class="grid">
+        <div>
+            <div class="card">
+                <h2>Parameter</h2>
+                <div class="fields">
+                    <div>
+                        <label class="field-label">Abstand Zielachse zu Laufseele (mm)</label>
+                        <input id="sightHeight" type="number" value="50" step="1">
+                    </div>
+                    <div>
+                        <label class="field-label">Fleckschuss-Entfernung (m)</label>
+                        <input id="zeroRange" type="number" value="10" step="5">
+                    </div>
+                    <div>
+                        <label class="field-label">Maximale Entfernung (m)</label>
+                        <input id="maxRange" type="number" value="100" step="10">
+                    </div>
+                    <div>
+                        <label class="field-label">Schrittweite Tabelle</label>
+                        <select id="step">
+                            <option value="1">1 Meter</option>
+                            <option value="2">2 Meter</option>
+                            <option value="5">5 Meter</option>
+                            <option value="10" selected>10 Meter</option>
+                            <option value="25">25 Meter</option>
+                            <option value="50">50 Meter</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="field-label">Geschoss-Typ</label>
+                        <select id="dragType" onchange="onPresetChange()">
+                            <option value="vacuum" data-mass="0.535" data-diam="4.5"  data-v0="175" data-i="999"  >Vakuum (kein Luftwiderstand)</option>
+                            <option value="preset" data-mass="0.535" data-diam="4.5"  data-v0="175" data-i="0.2505">Rundkugel 4,5 mm</option>
+                            <option value="preset" data-mass="0.535" data-diam="4.5"  data-v0="175" data-i="0.4697" selected>Diabolo 4,5 mm</option>
+                            <option value="preset" data-mass="2.59"  data-diam="5.6"  data-v0="330" data-i="0.9789">.22 lfB – Bleirundkopf</option>
+                            <option value="preset" data-mass="8.04"  data-diam="9.0"  data-v0="370" data-i="0.7059">9 mm Para – Stumpfheck</option>
+                            <option value="preset" data-mass="4.0"   data-diam="5.7"  data-v0="940" data-i="1.0301">.223 Rem – FMJ</option>
+                            <option value="preset" data-mass="9.46"  data-diam="7.82" data-v0="830" data-i="0.4890">.308 Win – Boattail</option>
+                            <option value="manual" data-mass=""      data-diam=""     data-v0=""    data-i=""     >Manuell eingeben</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="field-label">Mündungsgeschwindigkeit V₀ (m/s)</label>
+                        <input id="v0" type="number" value="175" step="1">
+                    </div>
+                    <div>
+                        <label class="field-label">Geschossgewicht (g)</label>
+                        <input id="bulletMass" type="number" value="0.535" step="0.001" min="0.001" oninput="updateBCDisplay()">
+                    </div>
+                    <div>
+                        <label class="field-label">Geschossdurchmesser (mm)</label>
+                        <input id="bulletDiam" type="number" value="4.5" step="0.01" min="0.1" oninput="updateBCDisplay()">
+                    </div>
+                    <div>
+                        <label class="field-label">Formfaktor i</label>
+                        <select id="formFactor" onchange="onFormFactorChange()">
+                            <option value="0.25">Rundkugel Blei, Luftgewehr (i ≈ 0.25)</option>
+                            <option value="0.47" selected>Diabolo, Luftgewehr (i ≈ 0.47)</option>
+                            <option value="0.49">Boattail .308 (i ≈ 0.49)</option>
+                            <option value="0.71">Stumpfheck 9 mm (i ≈ 0.71)</option>
+                            <option value="0.98">.22 lfB Bleirundkopf (i ≈ 0.98)</option>
+                            <option value="1.00">Spitzer Vollmantel / FMJ (i = 1.00)</option>
+                            <option value="custom">Manuell eingeben</option>
+                        </select>
+                        <div id="customIBlock" style="display:none;margin-top:8px">
+                            <input id="formFactorCustom" type="number" value="1.00" step="0.01" min="0.01" placeholder="Formfaktor i" oninput="updateBCDisplay()" style="width:100%;background:var(--input-bg);border:1px solid var(--border2);border-radius:16px;padding:10px 16px;font-size:.95rem;color:var(--text);outline:none">
+                        </div>
+                    </div>
+                    <div style="padding:10px 14px;background:var(--surface2);border-radius:12px;font-size:.85rem;color:var(--text2)">
+                        Berechneter BC (G1): <strong id="bcDisplay" style="color:var(--text)">—</strong>
+                    </div>
+                </div>
+
+                <div class="btn-actions">
+                    <button class="btn btn-primary" onclick="calculate()">Berechnen</button>
+                    <div class="btn-row">
+                        <button class="btn btn-green" onclick="exportCSV()">📥 CSV Export</button>
+                        <button class="btn btn-gray no-print" onclick="window.print()">🖨️ Drucken</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col2">
+            <div class="card">
+                <h2>Flugbahn – Höhe über Zielachse</h2>
+                <div id="summary" class="summary"></div>
+                <canvas id="trajectoryChart"></canvas>
+            </div>
+            <div class="card">
+                <h2>Ballistische Tabelle</h2>
+                <div class="tbl-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style="text-align:left">Entf. (m)</th>
+                                <th>Höhe (cm)</th>
+                                <th>Zeit (s)</th>
+                                <th>Geschw. (m/s)</th>
+                                <th>Energie (J)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let chart = null;
+    let currentData = [];
+
+    /* ── Theme ─────────────────────────────────────────────────── */
+    function cssVar(v) {
+        return getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+    }
+    function isDark() {
+        return document.documentElement.getAttribute('data-theme') === 'dark';
+    }
+    function applyTheme(dark) {
+        document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+        document.getElementById('themeBtn').textContent = dark ? '☀️' : '🌙';
+        localStorage.setItem('theme', dark ? 'dark' : 'light');
+        if (chart) refreshChartColors();
+    }
+    function toggleTheme() {
+        applyTheme(!isDark());
+    }
+
+    /* ── Preset / formfactor sync ─────────────────────────────── */
+    function getFormFactorI() {
+        const ffSel = document.getElementById('formFactor');
+        if (ffSel.value === 'custom')
+            return parseFloat(document.getElementById('formFactorCustom').value);
+        return parseFloat(ffSel.value);
+    }
+
+    function computeBC(massG, diamMm, i) {
+        // BC (G1) = m[lbs] / (i * d[in]²)
+        if (!massG || !diamMm || !i || i <= 0) return NaN;
+        return (massG / 453.592) / (i * Math.pow(diamMm / 25.4, 2));
+    }
+
+    function setFormFactorByI(iVal) {
+        const ffSel = document.getElementById('formFactor');
+        // find closest preset option
+        let bestOpt = null, bestDiff = Infinity;
+        for (const opt of ffSel.options) {
+            if (opt.value === 'custom') continue;
+            const diff = Math.abs(parseFloat(opt.value) - iVal);
+            if (diff < bestDiff) { bestDiff = diff; bestOpt = opt; }
+        }
+        if (bestDiff < 0.01 && bestOpt) {
+            ffSel.value = bestOpt.value;
+            document.getElementById('customIBlock').style.display = 'none';
+        } else {
+            ffSel.value = 'custom';
+            document.getElementById('customIBlock').style.display = '';
+            document.getElementById('formFactorCustom').value = iVal;
+        }
+    }
+
+    function updateBCDisplay() {
+        const massG  = parseFloat(document.getElementById('bulletMass').value);
+        const diamMm = parseFloat(document.getElementById('bulletDiam').value);
+        const i      = getFormFactorI();
+        const bc     = computeBC(massG, diamMm, i);
+        document.getElementById('bcDisplay').textContent = isNaN(bc) ? '—' : bc.toFixed(4);
+    }
+
+    function onFormFactorChange() {
+        const ffSel = document.getElementById('formFactor');
+        document.getElementById('customIBlock').style.display =
+            ffSel.value === 'custom' ? '' : 'none';
+        updateBCDisplay();
+    }
+
+    function onPresetChange() {
+        const sel = document.getElementById('dragType');
+        const opt = sel.options[sel.selectedIndex];
+        if (sel.value !== 'manual') {
+            document.getElementById('v0').value        = opt.dataset.v0;
+            document.getElementById('bulletMass').value = opt.dataset.mass;
+            document.getElementById('bulletDiam').value = opt.dataset.diam;
+            const iVal = parseFloat(opt.dataset.i);
+            if (iVal < 999) setFormFactorByI(iVal);
+        }
+        updateBCDisplay();
+    }
+
+    /* ── Simulation ────────────────────────────────────────────── */
+    function calculate() {
+        const sightHeight = parseFloat(document.getElementById('sightHeight').value) / 1000;
+        const v0          = parseFloat(document.getElementById('v0').value);
+        const zeroRange   = parseFloat(document.getElementById('zeroRange').value);
+        const maxRange    = parseFloat(document.getElementById('maxRange').value);
+        const step        = parseFloat(document.getElementById('step').value);
+        const bulletMassG = parseFloat(document.getElementById('bulletMass').value);
+        const bulletDiamMm= parseFloat(document.getElementById('bulletDiam').value);
+        const i_factor    = getFormFactorI();
+        const isVacuum    = document.getElementById('dragType').value === 'vacuum';
+
+        if (!sightHeight || !v0 || !zeroRange) return alert('Bitte alle wichtigen Felder ausfüllen.');
+        if (!bulletMassG || bulletMassG <= 0)  return alert('Bitte ein gültiges Geschossgewicht eingeben.');
+        if (!bulletDiamMm || bulletDiamMm <= 0) return alert('Bitte einen gültigen Geschossdurchmesser eingeben.');
+        if (!isVacuum && (!i_factor || i_factor <= 0)) return alert('Bitte einen gültigen Formfaktor eingeben.');
+
+        const g    = 9.81, rho = 1.225;
+        const mass = bulletMassG / 1000;  // kg
+
+        // BC (G1) = m[lbs] / (i * d[in]²), then convert to SI: 1 lb/in² = 703.07 kg/m²
+        // Retardation: a_drag = v² * R, R = rho / (2 * BC_SI)
+        const bc   = isVacuum ? 999 : computeBC(bulletMassG, bulletDiamMm, i_factor);
+        const bcSI = (bc >= 999) ? Infinity : bc * 703.07;
+        const R    = (bc >= 999) ? 0        : rho / (2 * bcSI);
+        const dt   = 0.001;
+
+        // Zero-angle iteration — bounded loop prevents hang
+        let theta = 0.01;
+        for (let i = 0; i < 40; i++) {
+            let x = 0, y = -sightHeight, vx = v0 * Math.cos(theta), vy = v0 * Math.sin(theta);
+            const maxSteps = Math.ceil((zeroRange / v0) * 10 / dt);
+            for (let s = 0; s < maxSteps && x < zeroRange - 0.01; s++) {
+                const v  = Math.sqrt(vx * vx + vy * vy);
+                const Rv = R * v;
+                vx -= Rv * vx * dt;
+                vy -= (g + Rv * vy) * dt;
+                x  += vx * dt;
+                y  += vy * dt;
+            }
+            theta -= (y / zeroRange) * 0.7;
+        }
+
+        // Main trajectory
+        const distances = [], heights = [];
+        currentData = [];
+        const crossings = [];
+        let maxHeight = -Infinity, maxHeightDist = 0;
+        let x = 0, y = -sightHeight;
+        let vx = v0 * Math.cos(theta), vy = v0 * Math.sin(theta), t = 0;
+        let prevY = y, nextTableX = 0;
+        const halfMass = 0.5 * mass;
+        const htmlRows = [];
+        const gn = cssVar('--green');
+        const rd = cssVar('--red');
+
+        while (x <= maxRange && vx > 0.5 && y > -4) {
+            if (x >= nextTableX) {
+                const heightCm = y * 100;
+                const v2       = vx * vx + vy * vy;
+                const vel      = Math.sqrt(v2);
+                const energyJ  = halfMass * v2;
+                const xRound   = Math.round(x);
+
+                distances.push(xRound);
+                heights.push(heightCm);
+                currentData.push({
+                    entfernung:      xRound,
+                    hoehe:           heightCm.toFixed(2),
+                    zeit:            t.toFixed(3),
+                    geschwindigkeit: vel.toFixed(1),
+                    energie:         energyJ.toFixed(2)
+                });
+
+                const hcol = heightCm >= 0 ? gn : rd;
+                htmlRows.push(
+                    `<tr><td>${xRound}</td>` +
+                    `<td style="color:${hcol};font-weight:600">${heightCm.toFixed(1)}</td>` +
+                    `<td>${t.toFixed(3)}</td>` +
+                    `<td>${vel.toFixed(1)}</td>` +
+                    `<td>${energyJ.toFixed(1)}</td></tr>`
+                );
+
+                if (heightCm > maxHeight) { maxHeight = heightCm; maxHeightDist = xRound; }
+                if (prevY * y < 0 && x > 1) crossings.push(xRound);
+                prevY = y;
+                nextTableX += step;
+            }
+            const v  = Math.sqrt(vx * vx + vy * vy);
+            const Rv = R * v;
+            vx -= Rv * vx * dt;
+            vy -= (g + Rv * vy) * dt;
+            x  += vx * dt;
+            y  += vy * dt;
+            t  += dt;
+        }
+
+        document.getElementById('tableBody').innerHTML = htmlRows.join('');
+        showSummary(crossings, maxHeight, maxHeightDist);
+        updateChart(distances, heights);
+    }
+
+    /* ── Summary ───────────────────────────────────────────────── */
+    function showSummary(crossings, maxH, maxHDist) {
+        let html = crossings.length >= 1
+            ? `<div><div class="s-label">1. Schnittpunkt</div><div class="s-val" style="color:var(--green)">${crossings[0]} m</div></div>`
+            : `<div><div class="s-label">1. Schnittpunkt</div><div class="s-val" style="color:var(--text3)">—</div></div>`;
+        html += crossings.length >= 2
+            ? `<div><div class="s-label">2. Schnittpunkt</div><div class="s-val" style="color:var(--green)">${crossings[1]} m</div></div>`
+            : `<div><div class="s-label">2. Schnittpunkt</div><div class="s-val" style="color:var(--text3)">—</div></div>`;
+        html += `<div><div class="s-label">Max. Überhöhung</div><div class="s-val">${maxH.toFixed(1)} cm <span style="font-size:.8rem;font-weight:400;color:var(--text2)">bei ${maxHDist} m</span></div></div>`;
+        document.getElementById('summary').innerHTML = html;
+    }
+
+    /* ── Chart ─────────────────────────────────────────────────── */
+    function chartColors() {
+        return {
+            grid: cssVar('--chart-grid'),
+            zero: cssVar('--chart-zero'),
+            fill: cssVar('--chart-fill'),
+            text: cssVar('--text2'),
+            line: cssVar('--blue'),
+        };
+    }
+
+    function refreshChartColors() {
+        if (!chart) return;
+        const c = chartColors();
+        chart.data.datasets[0].borderColor   = c.line;
+        chart.data.datasets[0].backgroundColor = c.fill;
+        chart.options.scales.x.grid.color    = c.grid;
+        chart.options.scales.x.ticks.color   = c.text;
+        chart.options.scales.x.title.color   = c.text;
+        chart.options.scales.y.ticks.color   = c.text;
+        chart.options.scales.y.title.color   = c.text;
+        chart.options.scales.y.grid.color    = (ctx) => ctx.tick.value === 0 ? c.zero : c.grid;
+        chart.update('none');
+    }
+
+    function updateChart(distances, heights) {
+        const c = chartColors();
+        if (chart) {
+            chart.data.labels = distances;
+            chart.data.datasets[0].data = heights;
+            refreshChartColors();
+            return;
+        }
+        chart = new Chart(document.getElementById('trajectoryChart'), {
+            type: 'line',
+            data: {
+                labels: distances,
+                datasets: [{
+                    data: heights,
+                    borderColor: c.line,
+                    backgroundColor: c.fill,
+                    tension: 0.35,
+                    borderWidth: 3,
+                    pointRadius: 1.5
+                }]
+            },
+            options: {
+                animation: false,
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: {
+                        title: { display: true, text: 'Entfernung (m)', color: c.text },
+                        ticks: { color: c.text },
+                        grid:  { color: c.grid }
+                    },
+                    y: {
+                        title: { display: true, text: 'Höhe (cm)', color: c.text },
+                        ticks: { color: c.text },
+                        grid:  {
+                            color: (ctx) => ctx.tick.value === 0 ? c.zero : c.grid,
+                            lineWidth: (ctx) => ctx.tick.value === 0 ? 2.5 : 1
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    /* ── CSV ───────────────────────────────────────────────────── */
+    function exportCSV() {
+        if (!currentData.length) return alert('Bitte zuerst berechnen!');
+        const rows = ['Entfernung (m);Höhe (cm);Zeit (s);Geschwindigkeit (m/s);Energie (J)'];
+        for (const r of currentData)
+            rows.push(`${r.entfernung};${r.hoehe};${r.zeit};${r.geschwindigkeit};${r.energie}`);
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(new Blob([rows.join('\n')], { type: 'text/csv' }));
+        a.download = `Ballistik_${document.getElementById('zeroRange').value}m.csv`;
+        a.click();
+    }
+
+    /* ── Init ──────────────────────────────────────────────────── */
+    window.onload = () => {
+        const saved = localStorage.getItem('theme');
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        applyTheme(saved ? saved === 'dark' : prefersDark);
+        onPresetChange();
+        calculate();
+    };
+</script>
+</body>
+</html>
