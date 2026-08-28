@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ballistik Rechner</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="ballistik-presets.js"></script>
     <style>
         /* ── Tokens ─────────────────────────────────────────────── */
         :root {
@@ -196,16 +197,7 @@
                     </div>
                     <div>
                         <label class="field-label">Geschoss-Typ</label>
-                        <select id="dragType" onchange="onPresetChange()">
-                            <option value="vacuum" data-mass="0.535" data-diam="4.5"  data-v0="175" data-i="999"  >Vakuum (kein Luftwiderstand)</option>
-                            <option value="preset" data-mass="0.535" data-diam="4.5"  data-v0="175" data-i="0.2505">Rundkugel 4,5 mm</option>
-                            <option value="preset" data-mass="0.535" data-diam="4.5"  data-v0="175" data-i="0.4697" selected>Diabolo 4,5 mm</option>
-                            <option value="preset" data-mass="2.59"  data-diam="5.6"  data-v0="330" data-i="0.9789">.22 lfB – Bleirundkopf</option>
-                            <option value="preset" data-mass="8.04"  data-diam="9.0"  data-v0="370" data-i="0.7059">9 mm Para – Stumpfheck</option>
-                            <option value="preset" data-mass="4.0"   data-diam="5.7"  data-v0="940" data-i="1.0301">.223 Rem – FMJ</option>
-                            <option value="preset" data-mass="9.46"  data-diam="7.82" data-v0="830" data-i="0.4890">.308 Win – Boattail</option>
-                            <option value="manual" data-mass=""      data-diam=""     data-v0=""    data-i=""     >Manuell eingeben</option>
-                        </select>
+                        <select id="dragType" onchange="onPresetChange()"></select>
                     </div>
                     <div>
                         <label class="field-label">Mündungsgeschwindigkeit V₀ (m/s)</label>
@@ -221,15 +213,7 @@
                     </div>
                     <div>
                         <label class="field-label">Formfaktor i</label>
-                        <select id="formFactor" onchange="onFormFactorChange()">
-                            <option value="0.25">Rundkugel Blei, Luftgewehr (i ≈ 0.25)</option>
-                            <option value="0.47" selected>Diabolo, Luftgewehr (i ≈ 0.47)</option>
-                            <option value="0.49">Boattail .308 (i ≈ 0.49)</option>
-                            <option value="0.71">Stumpfheck 9 mm (i ≈ 0.71)</option>
-                            <option value="0.98">.22 lfB Bleirundkopf (i ≈ 0.98)</option>
-                            <option value="1.00">Spitzer Vollmantel / FMJ (i = 1.00)</option>
-                            <option value="custom">Manuell eingeben</option>
-                        </select>
+                        <select id="formFactor" onchange="onFormFactorChange()"></select>
                         <div id="customIBlock" style="display:none;margin-top:8px">
                             <input id="formFactorCustom" type="number" value="1.00" step="0.01" min="0.01" placeholder="Formfaktor i" oninput="updateBCDisplay()" style="width:100%;background:var(--input-bg);border:1px solid var(--border2);border-radius:16px;padding:10px 16px;font-size:.95rem;color:var(--text);outline:none">
                         </div>
@@ -275,6 +259,14 @@
         </div>
     </div>
 </div>
+<!-- Footer -->
+    <footer class="max-w-6xl mx-auto px-6 py-8 text-center text-gray-500 text-sm border-t border-gray-200 mt-12">
+        <p>
+            Einfacher Ballistik-Rechner - 
+            <a href="https://github.com/boppr/ballistic-calculator" target="_blank" 
+               class="hover:text-gray-700 underline">GitHub Repository</a>
+			- GPL - fuer Bildungszwecke</p>
+    </footer>
 
 <script>
     let chart = null;
@@ -298,6 +290,22 @@
     }
 
     /* ── Preset / formfactor sync ─────────────────────────────── */
+    function populatePresets() {
+        if (typeof BULLET_PRESETS === 'undefined' || typeof FORM_FACTOR_PRESETS === 'undefined') {
+            alert('Fehler: ballistik-presets.js konnte nicht geladen werden. Bitte sicherstellen, dass diese Datei im selben Ordner wie ballistik.html liegt.');
+            return;
+        }
+        const dragSel = document.getElementById('dragType');
+        dragSel.innerHTML = BULLET_PRESETS.map(p =>
+            `<option value="${p.value}" data-mass="${p.mass}" data-diam="${p.diam}" data-v0="${p.v0}" data-i="${p.i}"${p.selected ? ' selected' : ''}>${p.label}</option>`
+        ).join('');
+
+        const ffSel = document.getElementById('formFactor');
+        ffSel.innerHTML = FORM_FACTOR_PRESETS.map(p =>
+            `<option value="${p.value}"${p.selected ? ' selected' : ''}>${p.label}</option>`
+        ).join('');
+    }
+
     function getFormFactorI() {
         const ffSel = document.getElementById('formFactor');
         if (ffSel.value === 'custom')
@@ -345,13 +353,20 @@
         updateBCDisplay();
     }
 
+    function setFieldValue(id, val) {
+        const el = document.getElementById(id);
+        el.value = val;
+        el.setAttribute('value', val);
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+
     function onPresetChange() {
         const sel = document.getElementById('dragType');
         const opt = sel.options[sel.selectedIndex];
         if (sel.value !== 'manual') {
-            document.getElementById('v0').value        = opt.dataset.v0;
-            document.getElementById('bulletMass').value = opt.dataset.mass;
-            document.getElementById('bulletDiam').value = opt.dataset.diam;
+            setFieldValue('v0', opt.dataset.v0);
+            setFieldValue('bulletMass', opt.dataset.mass);
+            setFieldValue('bulletDiam', opt.dataset.diam);
             const iVal = parseFloat(opt.dataset.i);
             if (iVal < 999) setFormFactorByI(iVal);
         }
@@ -559,6 +574,7 @@
         const saved = localStorage.getItem('theme');
         const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
         applyTheme(saved ? saved === 'dark' : prefersDark);
+        populatePresets();
         onPresetChange();
         calculate();
     };
